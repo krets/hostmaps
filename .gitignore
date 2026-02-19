@@ -1,0 +1,7 @@
+# Security: Never commit the config file
+config.php
+/private/*
+
+# System files
+.DS_Store
+Thumbs.db
