@@ -259,8 +259,9 @@ async function generateAndDownloadMap() {
 
     try {
         // 1. Construct Static Map URL
-        const width = 800;
-        const height = 600;
+        // Standard API limit is 640x640. 
+        const width = 640;
+        const height = 480;
         
         // Remove 'key' from here. The proxy will inject it.
         let staticUrl = `https://maps.googleapis.com/maps/api/staticmap?size=${width}x${height}&maptype=roadmap`;
@@ -272,7 +273,8 @@ async function generateAndDownloadMap() {
         }
         
         // Markers
-        staticUrl += `&markers=color:blue%7Clabel:P%7C${mapState.center.lat},${mapState.center.lng}`;
+        // Property: Use a yellow star icon
+        staticUrl += `&markers=icon:${encodeURIComponent("http://maps.google.com/mapfiles/kml/paddle/ylw-stars.png")}%7Cshadow:true%7C${mapState.center.lat},${mapState.center.lng}`;
         
         const legendData = [];
         mapState.selectedPlaceIds.forEach((id, index) => {
