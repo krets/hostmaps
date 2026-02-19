@@ -25,6 +25,11 @@ async function initMap() {
         center: { lat: -34.397, lng: 150.644 },
         zoom: 8,
         mapId: "DEMO_MAP_ID", // Required for AdvancedMarkerElement
+        disableDefaultUI: false, // Ensure UI controls are visible
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false
     });
 
     // Keep mapState in sync with actual map view
@@ -50,6 +55,19 @@ async function initMap() {
     });
 
     document.getElementById("download-btn").addEventListener("click", generateAndDownloadMap);
+    
+    // Mobile Navigation
+    const sidebar = document.querySelector('.sidebar');
+    const viewMapBtn = document.getElementById('view-map-btn');
+    const showListBtn = document.getElementById('show-list-btn');
+    
+    viewMapBtn.addEventListener('click', () => {
+        sidebar.classList.add('hidden');
+    });
+    
+    showListBtn.addEventListener('click', () => {
+        sidebar.classList.remove('hidden');
+    });
 }
 
 async function geocodeAddress(address) {
@@ -89,6 +107,11 @@ async function geocodeAddress(address) {
         });
 
         fetchNearbyPlaces(location.lat, location.lng);
+        
+        // Mobile: Switch to map view to show result
+        if (window.innerWidth <= 768) {
+            document.querySelector('.sidebar').classList.add('hidden');
+        }
 
     } catch (error) {
         console.error("Geocoding failed:", error);
@@ -149,6 +172,9 @@ async function searchForPlace(query) {
         // Update UI
         renderPlacesList(mapState.places);
         await renderPlaceMarkers(uniqueNew); // Only add markers for new ones
+        
+        // Mobile: Show map to confirm result? Or maybe stay on list to select.
+        // Let's stay on list so they can tap to select.
 
     } catch (e) {
         console.error("Manual search error:", e);
@@ -252,6 +278,9 @@ async function togglePlaceSelection(place) {
         mapState.selectedPlaces[place.id] = place; // Store full object
         await addRoute(place);
         updateMarkerStyle(place.id, true);
+        
+        // Mobile: Maybe switch to map to show route? 
+        // User might want to select multiple. Let's keep them on list unless they click "View Map".
     }
 
     updateUI(place.id, !isSelected);
@@ -434,8 +463,10 @@ async function generateAndDownloadMap() {
         // Generate filename
         let filename = "hostmap";
         if (mapState.addressString && mapState.addressString !== "Map") {
-            // Replace non-alphanumeric chars with underscores, remove trailing/leading underscores
-            const safeName = mapState.addressString.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+            // Take only the first part (Street Num + Name), e.g., "319 Old Lake Shore Rd"
+            const streetAddress = mapState.addressString.split(',')[0].trim();
+            // Replace non-alphanumeric chars with underscores
+            const safeName = streetAddress.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
             filename += "_" + safeName;
         }
         filename += ".png";

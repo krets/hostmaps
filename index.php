@@ -27,6 +27,8 @@ require_once 'config.php';
             <button id="search-place-btn">Search</button>
         </div>
 
+        <button id="view-map-btn" class="mobile-toggle-btn" style="display:none; margin-bottom:10px; background-color: #666;">View Map</button>
+
         <div id="attractions-list">
             <p class="placeholder-text">Enter an address to find nearby attractions.</p>
         </div>
@@ -36,6 +38,7 @@ require_once 'config.php';
         </div>
     </div>
 
+    <button id="show-list-btn" class="mobile-toggle-btn" style="display:none; position:absolute; bottom:20px; right:20px; z-index:100; background-color: #4285f4; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">Edit List</button>
     <div id="map"></div>
 </div>
 

@@ -8,6 +8,7 @@ body, html {
 .container {
     display: flex;
     height: 100vh;
+    position: relative; /* For absolute positioning of map button */
 }
 
 .sidebar {
@@ -20,6 +21,7 @@ body, html {
     flex-direction: column;
     overflow-y: auto;
     z-index: 2; /* Ensure sidebar is above map controls if overlapping */
+    transition: transform 0.3s ease-in-out;
 }
 
 #map {
@@ -130,6 +132,7 @@ button:hover {
     position: sticky;
     bottom: 0;
     background-color: #f9f9f9;
+    padding-bottom: 10px; /* Space for scroll */
 }
 
 #download-btn {
@@ -155,21 +158,34 @@ button:hover {
 }
 
 /* Mobile Responsiveness */
+.mobile-toggle-btn {
+    display: none !important; /* Hide by default on desktop */
+}
+
 @media (max-width: 768px) {
     .container {
-        flex-direction: column;
+        display: block; /* Remove flex to allow stacking via absolute/fixed */
+        overflow: hidden; /* Prevent body scroll when sidebar is open */
     }
 
     .sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
-        height: 45vh; /* Takes top 45% of screen */
+        height: 100%; /* Full screen */
         border-right: none;
-        border-bottom: 1px solid #ccc;
-        padding: 10px;
+        padding: 15px;
+        z-index: 1000; /* Above map */
+        transform: translateX(0); /* Visible */
+    }
+    
+    .sidebar.hidden {
+        transform: translateX(-100%); /* Slide out to hide */
     }
 
     #map {
-        height: 55vh; /* Takes remaining 55% */
+        height: 100vh; /* Full screen map */
         width: 100%;
     }
 
@@ -180,5 +196,21 @@ button:hover {
 
     .input-group {
         margin-bottom: 10px;
+    }
+    
+    .mobile-toggle-btn {
+        display: block !important; /* Show on mobile */
+    }
+    
+    /* Adjust map button position */
+    #show-list-btn {
+        display: block !important;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        z-index: 500; /* Above map tiles */
+        padding: 12px 20px;
+        border-radius: 30px; /* Pill shape */
+        font-weight: bold;
     }
 }
