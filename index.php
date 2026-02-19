@@ -28,7 +28,7 @@ require_once 'config.php';
         <h1>Map Generator</h1>
         
         <div class="input-group">
-            <input type="text" id="address-input" list="recent-addresses" placeholder="Enter rental property address">
+            <input type="text" id="address-input" list="recent-addresses" placeholder="Enter address">
             <datalist id="recent-addresses"></datalist>
             <button id="locate-btn">Locate</button>
         </div>
@@ -46,6 +46,9 @@ require_once 'config.php';
 
         <div class="actions">
             <button id="download-btn" disabled>Download Map (PNG)</button>
+            <div style="text-align: center; margin-top: 7px; font-size: 10px;">
+                <a href="https://github.com/krets/hostmaps/issues/new" target="_blank" style="color: #999; text-decoration: none;">Submit a Bug</a>
+            </div>
         </div>
     </div>
 
@@ -56,7 +59,7 @@ require_once 'config.php';
 <script>
     const GOOGLE_MAPS_API_KEY = "<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>";
 </script>
-<script src="app.js?v=20260219_7"></script>
+<script src="app.js?v=20260219_8"></script>
 <!-- Load Google Maps API -->
 <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>&libraries=places,marker,geometry&loading=async&v=weekly&callback=initMap" async defer></script>
 

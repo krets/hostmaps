@@ -21,9 +21,19 @@ async function initMap() {
     const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
     const { encoding } = await google.maps.importLibrary("geometry"); // Explicitly import geometry
 
+    // Random major city for initial view
+    const cities = [
+        { lat: 40.7128, lng: -74.0060 }, // NYC
+        { lat: 51.5074, lng: -0.1278 },  // London
+        { lat: 35.6762, lng: 139.6503 }, // Tokyo
+        { lat: 48.8566, lng: 2.3522 },   // Paris
+        { lat: 37.7749, lng: -122.4194 } // SF
+    ];
+    const initialCenter = cities[Math.floor(Math.random() * cities.length)];
+
     map = new Map(document.getElementById("map"), {
-        center: { lat: -34.397, lng: 150.644 },
-        zoom: 8,
+        center: initialCenter,
+        zoom: 10,
         mapId: "DEMO_MAP_ID", // Required for AdvancedMarkerElement
         disableDefaultUI: false, // Ensure UI controls are visible
         zoomControl: true,
