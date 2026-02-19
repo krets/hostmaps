@@ -56,7 +56,7 @@ require_once 'config.php';
 <script>
     const GOOGLE_MAPS_API_KEY = "<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>";
 </script>
-<script src="app.js?v=20260219_6"></script>
+<script src="app.js?v=20260219_7"></script>
 <!-- Load Google Maps API -->
 <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>&libraries=places,marker,geometry&loading=async&v=weekly&callback=initMap" async defer></script>
 

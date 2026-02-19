@@ -81,7 +81,8 @@ function loadHistory() {
 
     if (history.length > 0) {
         // Restore the most recent search automatically on load
-        restoreSession(history[0]);
+        // Pass isInitialLoad = true to prevent sidebar hiding
+        restoreSession(history[0], true);
     }
 }
 
@@ -127,7 +128,7 @@ function renderHistoryUI(history) {
     });
 }
 
-async function restoreSession(item) {
+async function restoreSession(item, isInitialLoad = false) {
     // 1. Set State
     const location = { lat: item.lat, lng: item.lng };
     mapState.addressString = item.address;
@@ -176,8 +177,8 @@ async function restoreSession(item) {
     // Update Download Button state
     document.getElementById("download-btn").disabled = selectedList.length === 0;
 
-    // Mobile: Switch to map view
-    if (window.innerWidth <= 1100) {
+    // Mobile: Switch to map view ONLY if NOT initial load
+    if (!isInitialLoad && window.innerWidth <= 1100) {
         const sidebar = document.querySelector('.sidebar');
         if (sidebar) sidebar.classList.add('hidden');
     }
@@ -189,7 +190,8 @@ async function geocodeAddress(address) {
     const matchingItem = history.find(item => item.address === address);
     
     if (matchingItem) {
-        restoreSession(matchingItem);
+        // If found in history, restore it (NOT initial load, so hide sidebar is fine)
+        restoreSession(matchingItem, false);
         return;
     }
 
