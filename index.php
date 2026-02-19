@@ -18,10 +18,11 @@ require_once 'config.php';
         <h1>Map Generator</h1>
         
         <div class="input-group">
-            <input type="text" id="address-input" placeholder="Enter rental property address">
+            <input type="text" id="address-input" list="recent-addresses" placeholder="Enter rental property address">
+            <datalist id="recent-addresses"></datalist>
             <button id="locate-btn">Locate</button>
         </div>
-
+        
         <div class="input-group" style="border-top: 1px solid #ddd; padding-top: 20px;">
             <input type="text" id="place-search-input" placeholder="Search for specific place...">
             <button id="search-place-btn">Search</button>
@@ -45,7 +46,7 @@ require_once 'config.php';
 <script>
     const GOOGLE_MAPS_API_KEY = "<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>";
 </script>
-<script src="app.js?v=20260219_3"></script>
+<script src="app.js?v=20260219_6"></script>
 <!-- Load Google Maps API -->
 <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>&libraries=places,marker,geometry&loading=async&v=weekly&callback=initMap" async defer></script>
 

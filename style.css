@@ -162,7 +162,7 @@ button:hover {
     display: none !important; /* Hide by default on desktop */
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
     .container {
         display: block; /* Remove flex to allow stacking via absolute/fixed */
         overflow: hidden; /* Prevent body scroll when sidebar is open */

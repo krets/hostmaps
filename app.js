@@ -61,16 +61,138 @@ async function initMap() {
     const viewMapBtn = document.getElementById('view-map-btn');
     const showListBtn = document.getElementById('show-list-btn');
     
-    viewMapBtn.addEventListener('click', () => {
-        sidebar.classList.add('hidden');
+    if (viewMapBtn && showListBtn) {
+        viewMapBtn.addEventListener('click', () => {
+            sidebar.classList.add('hidden');
+        });
+        
+        showListBtn.addEventListener('click', () => {
+            sidebar.classList.remove('hidden');
+        });
+    }
+
+    // Load History
+    loadHistory();
+}
+
+function loadHistory() {
+    const history = JSON.parse(localStorage.getItem('hostmaps_history') || '[]');
+    renderHistoryUI(history);
+
+    if (history.length > 0) {
+        // Restore the most recent search automatically on load
+        restoreSession(history[0]);
+    }
+}
+
+function saveHistory(address, location, selectedPlaces = {}) {
+    let history = JSON.parse(localStorage.getItem('hostmaps_history') || '[]');
+    
+    // Remove duplicate entry for this address if it exists
+    history = history.filter(item => item.address !== address);
+    
+    // Add new entry to the top
+    history.unshift({
+        address: address,
+        lat: location.lat,
+        lng: location.lng,
+        selectedPlaces: selectedPlaces,
+        timestamp: Date.now()
     });
     
-    showListBtn.addEventListener('click', () => {
-        sidebar.classList.remove('hidden');
+    // Keep only last 5
+    if (history.length > 5) {
+        history.pop();
+    }
+    
+    localStorage.setItem('hostmaps_history', JSON.stringify(history));
+    renderHistoryUI(history);
+}
+
+function updateHistorySelection() {
+    if (!mapState.addressString) return;
+    saveHistory(mapState.addressString, mapState.propertyLocation, mapState.selectedPlaces);
+}
+
+function renderHistoryUI(history) {
+    // Populate datalist instead of visible list
+    const datalist = document.getElementById('recent-addresses');
+    if (!datalist) return;
+    
+    datalist.innerHTML = '';
+    history.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.address;
+        datalist.appendChild(option);
     });
 }
 
+async function restoreSession(item) {
+    // 1. Set State
+    const location = { lat: item.lat, lng: item.lng };
+    mapState.addressString = item.address;
+    mapState.propertyLocation = location;
+    mapState.center = location;
+    mapState.selectedPlaces = item.selectedPlaces || {};
+    mapState.zoom = 13;
+    
+    document.getElementById('address-input').value = item.address;
+
+    // 2. Clear Map & Reset UI
+    clearMap();
+    map.setCenter(location);
+    map.setZoom(13);
+    
+    // 3. Property Marker
+    const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+    const pin = new PinElement({
+        background: "#4285F4",
+        borderColor: "#1a73e8",
+        glyphColor: "white",
+    });
+
+    propertyMarker = new AdvancedMarkerElement({
+        map: map,
+        position: location,
+        title: "Rental Property",
+        content: pin.element,
+    });
+
+    // 4. Restore Selected Places (Markers & Routes)
+    const selectedList = Object.values(mapState.selectedPlaces);
+    
+    // Render markers for selected items immediately
+    await renderPlaceMarkers(selectedList);
+    
+    // Fetch routes for selected items
+    for (const place of selectedList) {
+        await addRoute(place);
+        updateMarkerStyle(place.id, true);
+    }
+    
+    // 5. Fetch Nearby (Merge with selected)
+    fetchNearbyPlaces(location.lat, location.lng, true);
+    
+    // Update Download Button state
+    document.getElementById("download-btn").disabled = selectedList.length === 0;
+
+    // Mobile: Switch to map view
+    if (window.innerWidth <= 1100) {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) sidebar.classList.add('hidden');
+    }
+}
+
 async function geocodeAddress(address) {
+    // Check if address matches a history item first
+    const history = JSON.parse(localStorage.getItem('hostmaps_history') || '[]');
+    const matchingItem = history.find(item => item.address === address);
+    
+    if (matchingItem) {
+        restoreSession(matchingItem);
+        return;
+    }
+
     try {
         const response = await fetch(`api.php?action=geocode&address=${encodeURIComponent(address)}`);
         const data = await response.json();
@@ -81,7 +203,8 @@ async function geocodeAddress(address) {
         }
 
         // Store formatted address for filename
-        mapState.addressString = data.formatted_address || address;
+        const formattedAddress = data.formatted_address || address;
+        mapState.addressString = formattedAddress;
 
         const location = { lat: data.lat, lng: data.lng };
         map.setCenter(location);
@@ -89,6 +212,9 @@ async function geocodeAddress(address) {
         mapState.center = location;
         mapState.propertyLocation = location; // Store fixed property location
         mapState.zoom = 13;
+        
+        // Reset selection for new search
+        mapState.selectedPlaces = {}; 
 
         clearMap();
 
@@ -105,11 +231,14 @@ async function geocodeAddress(address) {
             title: "Rental Property",
             content: pin.element,
         });
+        
+        // Save to history
+        saveHistory(formattedAddress, location, {});
 
         fetchNearbyPlaces(location.lat, location.lng);
         
         // Mobile: Switch to map view to show result
-        if (window.innerWidth <= 768) {
+        if (window.innerWidth <= 1100) {
             document.querySelector('.sidebar').classList.add('hidden');
         }
 
@@ -119,7 +248,7 @@ async function geocodeAddress(address) {
     }
 }
 
-async function fetchNearbyPlaces(lat, lng) {
+async function fetchNearbyPlaces(lat, lng, isRestore = false) {
     try {
         const response = await fetch(`api.php?action=places&lat=${lat}&lng=${lng}`);
         const data = await response.json();
@@ -129,9 +258,26 @@ async function fetchNearbyPlaces(lat, lng) {
             return;
         }
 
-        const places = data.places || [];
+        let places = data.places || [];
+        
+        // Merge with existing selected places (from history)
+        const selectedList = Object.values(mapState.selectedPlaces);
+        const fetchedIds = places.map(p => p.id);
+        
+        // Add selected places that weren't fetched (e.g. manual search results)
+        const missingSelected = selectedList.filter(p => !fetchedIds.includes(p.id));
+        places = [...places, ...missingSelected];
+        
         renderPlacesList(places);
-        await renderPlaceMarkers(places);
+        
+        if (isRestore) {
+             // Filter out those already rendered
+             const renderedIds = markers.map(m => m.placeId);
+             const newToRender = places.filter(p => !renderedIds.includes(p.id));
+             await renderPlaceMarkers(newToRender);
+        } else {
+             await renderPlaceMarkers(places);
+        }
 
     } catch (error) {
         console.error("Failed to fetch places:", error);
@@ -190,7 +336,8 @@ function clearMap() {
     }
     Object.values(placePolylines).forEach(p => p.setMap(null));
     placePolylines = {};
-    mapState.selectedPlaces = {}; // Clear map
+    
+    // mapState.selectedPlaces = {}; // REMOVED: Managed by caller
     mapState.placeRoutes = {};
     mapState.places = [];
 }
@@ -286,6 +433,9 @@ async function togglePlaceSelection(place) {
     updateUI(place.id, !isSelected);
     // Check if keys array has length
     document.getElementById("download-btn").disabled = Object.keys(mapState.selectedPlaces).length === 0;
+    
+    // Update History
+    updateHistorySelection();
 }
 
 async function updateMarkerStyle(placeId, isSelected) {
