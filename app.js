@@ -7,8 +7,9 @@ let placePolylines = {}; // Map placeId -> Polyline object
 let mapState = {
     center: { lat: 0, lng: 0 },
     zoom: 12,
+    propertyLocation: null, // Fixed location of the rental property
     places: [], // Array of all fetched place objects
-    selectedPlaceIds: [], // Array of strings
+    selectedPlaces: {}, // Map placeId -> Place Object (Robust storage)
     placeRoutes: {} // Map placeId -> { polyline, duration }
 };
 
@@ -17,6 +18,7 @@ async function initMap() {
     // Request needed libraries.
     const { Map } = await google.maps.importLibrary("maps");
     const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+    const { encoding } = await google.maps.importLibrary("geometry"); // Explicitly import geometry
 
     map = new Map(document.getElementById("map"), {
         center: { lat: -34.397, lng: 150.644 },
@@ -38,6 +40,14 @@ async function initMap() {
         }
     });
 
+    // Manual Search Listener
+    document.getElementById("search-place-btn").addEventListener("click", () => {
+        const query = document.getElementById("place-search-input").value;
+        if (query) {
+            searchForPlace(query);
+        }
+    });
+
     document.getElementById("download-btn").addEventListener("click", generateAndDownloadMap);
 }
 
@@ -55,6 +65,7 @@ async function geocodeAddress(address) {
         map.setCenter(location);
         map.setZoom(13); // Slightly wider zoom to see radius
         mapState.center = location;
+        mapState.propertyLocation = location; // Store fixed property location
         mapState.zoom = 13;
 
         clearMap();
@@ -100,6 +111,46 @@ async function fetchNearbyPlaces(lat, lng) {
     }
 }
 
+async function searchForPlace(query) {
+    // Ensure we have a location to search near
+    const loc = mapState.propertyLocation || mapState.center;
+    
+    try {
+        const response = await fetch(`api.php?action=text_search&lat=${loc.lat}&lng=${loc.lng}&query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data.error) {
+             alert("Search failed: " + data.error);
+             return;
+        }
+        
+        const newPlaces = data.places || [];
+        if (newPlaces.length === 0) {
+            alert("No places found matching '" + query + "' nearby.");
+            return;
+        }
+
+        // Merge new places with existing
+        // Filter out duplicates based on ID
+        const currentIds = mapState.places.map(p => p.id);
+        const uniqueNew = newPlaces.filter(p => !currentIds.includes(p.id));
+        
+        if (uniqueNew.length === 0) {
+            alert("Place already in list.");
+            return;
+        }
+
+        mapState.places = [...mapState.places, ...uniqueNew];
+        
+        // Update UI
+        renderPlacesList(mapState.places);
+        await renderPlaceMarkers(uniqueNew); // Only add markers for new ones
+
+    } catch (e) {
+        console.error("Manual search error:", e);
+    }
+}
+
 function clearMap() {
     markers.forEach(m => m.map = null);
     markers = [];
@@ -109,7 +160,7 @@ function clearMap() {
     }
     Object.values(placePolylines).forEach(p => p.setMap(null));
     placePolylines = {};
-    mapState.selectedPlaceIds = [];
+    mapState.selectedPlaces = {}; // Clear map
     mapState.placeRoutes = {};
     mapState.places = [];
 }
@@ -135,6 +186,11 @@ function renderPlacesList(places) {
         if (place.primaryType === "tourist_attraction") iconName = "local_see";
         if (place.primaryType === "ski_resort") iconName = "ac_unit";
 
+        // Check if selected (using map key)
+        if (mapState.selectedPlaces[place.id]) {
+            item.classList.add("selected");
+        }
+
         item.innerHTML = `
             <i class="material-icons attraction-icon">${iconName}</i>
             <div class="attraction-info">
@@ -143,6 +199,14 @@ function renderPlacesList(places) {
                 <span class="route-info" id="route-${place.id}"></span>
             </div>
         `;
+
+        // Restore route info if already fetched
+        if (mapState.placeRoutes[place.id]) {
+             setTimeout(() => {
+                 const el = document.getElementById(`route-${place.id}`);
+                 if(el) el.textContent = `${mapState.placeRoutes[place.id].duration} drive`;
+             }, 0);
+        }
 
         item.addEventListener("click", () => togglePlaceSelection(place));
         list.appendChild(item);
@@ -171,21 +235,24 @@ async function renderPlaceMarkers(places) {
 }
 
 async function togglePlaceSelection(place) {
-    const index = mapState.selectedPlaceIds.indexOf(place.id);
-    const isSelected = index !== -1;
+    // Check if ID is in the keys
+    const isSelected = !!mapState.selectedPlaces[place.id];
 
     if (isSelected) {
-        mapState.selectedPlaceIds.splice(index, 1);
+        // Deselect: Remove from map
+        delete mapState.selectedPlaces[place.id];
         removeRoute(place.id);
         updateMarkerStyle(place.id, false);
     } else {
-        mapState.selectedPlaceIds.push(place.id);
+        // Select: Add to map
+        mapState.selectedPlaces[place.id] = place; // Store full object
         await addRoute(place);
         updateMarkerStyle(place.id, true);
     }
 
     updateUI(place.id, !isSelected);
-    document.getElementById("download-btn").disabled = mapState.selectedPlaceIds.length === 0;
+    // Check if keys array has length
+    document.getElementById("download-btn").disabled = Object.keys(mapState.selectedPlaces).length === 0;
 }
 
 async function updateMarkerStyle(placeId, isSelected) {
@@ -210,8 +277,8 @@ function updateUI(placeId, isSelected) {
 }
 
 async function addRoute(place) {
-    // Ensure we use the property location (or map center if property not set, but geocode should set it)
-    const origin = `${mapState.center.lat},${mapState.center.lng}`;
+    const startLoc = mapState.propertyLocation || mapState.center;
+    const origin = `${startLoc.lat},${startLoc.lng}`;
     const destination = `${place.location.latitude},${place.location.longitude}`;
     try {
         const response = await fetch(`api.php?action=directions&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving`);
@@ -251,6 +318,20 @@ function removeRoute(placeId) {
     if (routeEl) routeEl.textContent = "";
 }
 
+function loadIcon(url) {
+    const proxyUrl = `api.php?action=proxy&url=${encodeURIComponent(url)}`;
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+            console.warn(`Failed to load icon: ${url}`);
+            resolve(null);
+        };
+        img.src = proxyUrl;
+    });
+}
+
 async function generateAndDownloadMap() {
     const btn = document.getElementById("download-btn");
     const originalText = btn.textContent;
@@ -258,86 +339,91 @@ async function generateAndDownloadMap() {
     btn.textContent = "Generating...";
 
     try {
-        // 1. Construct Static Map URL
-        // Standard API limit is 640x640. 
         const width = 640;
         const height = 480;
-        
-        // Remove 'key' from here. The proxy will inject it.
         let staticUrl = `https://maps.googleapis.com/maps/api/staticmap?size=${width}x${height}&maptype=roadmap`;
         
-        // If no markers/routes, fallback to center/zoom. 
-        // But if we have markers, Static Maps API auto-fits.
-        if (mapState.selectedPlaceIds.length === 0) {
+        // Get Selected Places from our robust map
+        const selectedPlacesList = Object.values(mapState.selectedPlaces);
+
+        if (selectedPlacesList.length === 0) {
              staticUrl += `&center=${mapState.center.lat},${mapState.center.lng}&zoom=${mapState.zoom}`;
         }
         
-        // Markers
-        // Property: Use a yellow star icon
-        staticUrl += `&markers=icon:${encodeURIComponent("http://maps.google.com/mapfiles/kml/paddle/ylw-stars.png")}%7Cshadow:true%7C${mapState.center.lat},${mapState.center.lng}`;
+        const pLoc = mapState.propertyLocation || mapState.center;
+        staticUrl += `&markers=icon:${encodeURIComponent("https://maps.google.com/mapfiles/kml/pal4/icon47.png")}%7C${pLoc.lat},${pLoc.lng}`;
         
         const legendData = [];
-        mapState.selectedPlaceIds.forEach((id, index) => {
-            const place = mapState.places.find(p => p.id === id);
+        const iconPromises = [];
+
+        selectedPlacesList.forEach((place, index) => {
+            const id = place.id;
             const route = mapState.placeRoutes[id];
-            if (place) {
-                const label = String.fromCharCode(65 + (index % 26));
-                staticUrl += `&markers=color:red%7Clabel:${label}%7C${place.location.latitude},${place.location.longitude}`;
-                legendData.push({ label, name: place.displayName.text, duration: route ? route.duration : '' });
-            }
+            
+            const label = String.fromCharCode(65 + (index % 26));
+            
+            // MAP: Standard Red Markers with Labels
+            staticUrl += `&markers=color:red%7Clabel:${label}%7C${place.location.latitude},${place.location.longitude}`;
+            
+            // LEGEND: Paddle Icons
+            const paddleIconUrl = `https://maps.google.com/mapfiles/kml/paddle/${label}.png`;
+            
+            legendData.push({ label, name: place.displayName.text, duration: route ? route.duration : '', iconUrl: paddleIconUrl });
+            iconPromises.push(loadIcon(paddleIconUrl));
         });
 
         // Polylines
         Object.values(mapState.placeRoutes).forEach(r => {
-             // Style: color:red|weight:5|enc:DATA
-             // We must URL encode the polyline data properly
              const stylePrefix = "color:0xff0000ff|weight:5|enc:";
-             // Note: encodeURIComponent encodes | to %7C which is what we want for the URL param value
              staticUrl += `&path=${encodeURIComponent(stylePrefix)}${encodeURIComponent(r.polyline)}`;
         });
 
-        // 2. Fetch via Proxy
         const proxyUrl = `api.php?action=proxy&url=${encodeURIComponent(staticUrl)}`;
-        const img = new Image();
-        img.crossOrigin = "anonymous";
+        const imgMap = new Image();
+        imgMap.crossOrigin = "anonymous";
         
-        await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = () => reject(new Error("Image failed to load via proxy"));
-            img.src = proxyUrl;
+        const mapPromise = new Promise((resolve, reject) => {
+            imgMap.onload = () => resolve(imgMap);
+            imgMap.onerror = () => reject(new Error("Map image failed to load via proxy"));
+            imgMap.src = proxyUrl;
         });
 
-        // 3. Draw to Canvas
+        const [loadedMap, ...loadedIcons] = await Promise.all([mapPromise, ...iconPromises]);
+
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         
-        const legendHeight = 60 + (legendData.length * 30);
+        const itemHeight = 40;
+        const legendHeight = 60 + (legendData.length * itemHeight);
         canvas.width = width;
         canvas.height = height + legendHeight;
 
-        // Background
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Map
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(loadedMap, 0, 0);
 
-        // Legend
         ctx.fillStyle = "black";
         ctx.font = "bold 20px Arial";
         ctx.fillText("Nearby Attractions & Travel Times", 40, height + 40);
         
         ctx.font = "16px Arial";
         legendData.forEach((item, i) => {
-            const y = height + 80 + (i * 30);
-            ctx.fillStyle = "red";
-            ctx.fillText(`[ ${item.label} ]`, 40, y);
+            const y = height + 70 + (i * itemHeight);
+            const iconImg = loadedIcons[i];
+            
+            if (iconImg) {
+                ctx.drawImage(iconImg, 40, y - 24, 32, 32); 
+            } else {
+                ctx.fillStyle = "red";
+                ctx.fillText(`[ ${item.label} ]`, 40, y);
+            }
+
             ctx.fillStyle = "black";
             const durationText = item.duration ? `(${item.duration} drive)` : "";
-            ctx.fillText(`${item.name} ${durationText}`, 100, y);
+            ctx.fillText(`${item.name} ${durationText}`, 90, y);
         });
 
-        // 4. Send to download.php for metadata and final delivery
         const dataUrl = canvas.toDataURL("image/png");
         const blob = await (await fetch(dataUrl)).blob();
         

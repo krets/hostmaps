@@ -22,6 +22,11 @@ require_once 'config.php';
             <button id="locate-btn">Locate</button>
         </div>
 
+        <div class="input-group" style="border-top: 1px solid #ddd; padding-top: 20px;">
+            <input type="text" id="place-search-input" placeholder="Search for specific place...">
+            <button id="search-place-btn">Search</button>
+        </div>
+
         <div id="attractions-list">
             <p class="placeholder-text">Enter an address to find nearby attractions.</p>
         </div>
@@ -37,7 +42,7 @@ require_once 'config.php';
 <script>
     const GOOGLE_MAPS_API_KEY = "<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>";
 </script>
-<script src="app.js"></script>
+<script src="app.js?v=20260219_2"></script>
 <!-- Load Google Maps API -->
 <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>&libraries=places,marker,geometry&loading=async&v=weekly&callback=initMap" async defer></script>
 
