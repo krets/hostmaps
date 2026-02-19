@@ -1,54 +1,72 @@
 body, html {
     margin: 0;
     padding: 0;
+    width: 100%;
     height: 100%;
+    /* Lock the body completely */
+    overflow: hidden; 
+    overscroll-behavior: none;
     font-family: 'Arial', sans-serif;
 }
 
 .container {
+    /* Absolute lock to viewport */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
-    height: 100vh;
-    position: relative; /* For absolute positioning of map button */
 }
 
 .sidebar {
     width: 350px;
     background-color: #f9f9f9;
     border-right: 1px solid #ccc;
-    padding: 20px;
     box-sizing: border-box;
+    /* Flex column to manage internal scrolling */
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
-    z-index: 2; /* Ensure sidebar is above map controls if overlapping */
+    z-index: 2; 
     transition: transform 0.3s ease-in-out;
+}
+
+/* Sidebar Header Area (Static) */
+.sidebar > h1, 
+.sidebar > .input-group,
+.sidebar > #view-map-btn {
+    flex-shrink: 0; /* Never shrink */
+    margin-left: 20px;
+    margin-right: 20px;
+}
+/* Add top margin to first element */
+.sidebar > h1 { margin-top: 20px; }
+
+/* The Scrollable List (Takes remaining space) */
+#attractions-list {
+    flex: 1; /* Grow to fill space */
+    overflow-y: auto; /* Internal scroll only */
+    padding: 0 20px; /* Padding inside scroll area */
+    min-height: 0; /* Crucial for nested flex scrolling */
+}
+
+/* Sidebar Footer Area (Static) */
+.actions {
+    flex-shrink: 0; /* Never shrink */
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-top: 1px solid #ddd;
+    /* No sticky needed in flex layout */
 }
 
 #map {
     flex: 1;
     height: 100%;
+    width: 100%;
 }
 
-h1 {
-    font-size: 24px;
-    margin-top: 0;
-    margin-bottom: 20px;
-}
-
-.input-group {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-#address-input {
-    flex: 1;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-#place-search-input {
+/* Input Styles */
+#address-input, #place-search-input {
     flex: 1;
     padding: 10px;
     border: 1px solid #ccc;
@@ -64,76 +82,7 @@ button {
     cursor: pointer;
 }
 
-button:hover {
-    background-color: #357ae8;
-}
-
-#attractions-list {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 100px; /* Ensure list has some space */
-}
-
-.attraction-item {
-    background-color: white;
-    padding: 15px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.attraction-item:hover {
-    background-color: #f0f0f0;
-}
-
-.attraction-item.selected {
-    border-left: 5px solid #4285f4;
-    background-color: #e8f0fe;
-}
-
-.attraction-icon {
-    font-size: 24px;
-    color: #555;
-}
-
-.attraction-info {
-    flex: 1;
-}
-
-.attraction-name {
-    font-weight: bold;
-    display: block;
-    margin-bottom: 4px;
-}
-
-.attraction-type {
-    font-size: 12px;
-    color: #666;
-    display: block;
-}
-
-.route-info {
-    font-size: 12px;
-    color: #4285f4;
-    margin-top: 5px;
-    display: block;
-}
-
-.actions {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #ddd;
-    /* Sticky footer for actions */
-    position: sticky;
-    bottom: 0;
-    background-color: #f9f9f9;
-    padding-bottom: 10px; /* Space for scroll */
-}
+button:hover { background-color: #357ae8; }
 
 #download-btn {
     width: 100%;
@@ -146,26 +95,36 @@ button:hover {
     font-size: 16px;
 }
 
-#download-btn:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
+#download-btn:disabled { background-color: #ccc; cursor: not-allowed; }
 
-.placeholder-text {
-    color: #888;
-    text-align: center;
-    margin-top: 50px;
+/* Item Styles */
+.attraction-item {
+    background-color: white;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
+.attraction-item:hover { background-color: #f0f0f0; }
+.attraction-item.selected { border-left: 5px solid #4285f4; background-color: #e8f0fe; }
+.attraction-icon { font-size: 24px; color: #555; }
+.attraction-info { flex: 1; }
+.attraction-name { font-weight: bold; display: block; margin-bottom: 4px; }
+.attraction-type { font-size: 12px; color: #666; display: block; }
+.route-info { font-size: 12px; color: #4285f4; margin-top: 5px; display: block; }
+.placeholder-text { color: #888; text-align: center; margin-top: 50px; }
 
 /* Mobile Responsiveness */
-.mobile-toggle-btn {
-    display: none !important; /* Hide by default on desktop */
-}
+.mobile-toggle-btn { display: none !important; }
 
 @media (max-width: 1100px) {
     .container {
-        display: block; /* Remove flex to allow stacking via absolute/fixed */
-        overflow: hidden; /* Prevent body scroll when sidebar is open */
+        display: block; /* Stack */
     }
 
     .sidebar {
@@ -173,44 +132,34 @@ button:hover {
         top: 0;
         left: 0;
         width: 100%;
-        height: 100%; /* Full screen */
+        height: 100%; /* Full height of locked container */
         border-right: none;
-        padding: 15px;
-        z-index: 1000; /* Above map */
-        transform: translateX(0); /* Visible */
+        padding: 0; /* Reset padding, managed by children */
+        z-index: 1000;
+        transform: translateX(0);
     }
     
     .sidebar.hidden {
-        transform: translateX(-100%); /* Slide out to hide */
+        transform: translateX(-100%);
     }
 
     #map {
-        height: 100vh; /* Full screen map */
+        height: 100%;
         width: 100%;
     }
 
-    h1 {
-        font-size: 18px;
-        margin-bottom: 10px;
-    }
-
-    .input-group {
-        margin-bottom: 10px;
-    }
+    .mobile-toggle-btn { display: block !important; }
     
-    .mobile-toggle-btn {
-        display: block !important; /* Show on mobile */
-    }
-    
-    /* Adjust map button position */
+    /* Fixed 'Edit List' button */
     #show-list-btn {
         display: block !important;
-        position: fixed; /* Fixed to viewport */
-        bottom: 90px; /* Higher up to avoid mobile browser bars */
+        position: fixed; 
+        bottom: 90px; /* Safe area */
         right: 20px;
-        z-index: 500; /* Above map tiles */
+        z-index: 500;
         padding: 12px 20px;
-        border-radius: 30px; /* Pill shape */
+        border-radius: 30px;
         font-weight: bold;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
 }
