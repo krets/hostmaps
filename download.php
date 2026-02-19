@@ -14,6 +14,13 @@ if (!isset($_FILES['image'])) {
 $pngData = file_get_contents($_FILES['image']['tmp_name']);
 $meta = $_POST['meta'] ?? '{}';
 $attractionName = $_POST['attractionName'] ?? 'Map';
+$filename = $_POST['filename'] ?? 'map_with_legend.png';
+
+// Sanitize filename for security (basic check)
+$filename = basename($filename); // Prevent path traversal
+if (empty($filename) || !preg_match('/^[a-zA-Z0-9_\-\.]+$/', $filename)) {
+    $filename = 'map_with_legend.png';
+}
 
 // 2. Metadata Injection Function (Native PHP, no GD required)
 function injectPngMetadata($pngData, $key, $value) {
@@ -38,8 +45,14 @@ function injectPngMetadata($pngData, $key, $value) {
 
 $finalImg = injectPngMetadata($pngData, "MapContext", $meta);
 
+
+
 // 3. Serve File
+
 header("Content-Type: image/png");
-header("Content-Disposition: attachment; filename=\"map_with_legend.png\"");
+
+header("Content-Disposition: attachment; filename=\"{$filename}\"");
+
 echo $finalImg;
+
 ?>

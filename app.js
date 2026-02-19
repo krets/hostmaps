@@ -8,6 +8,7 @@ let mapState = {
     center: { lat: 0, lng: 0 },
     zoom: 12,
     propertyLocation: null, // Fixed location of the rental property
+    addressString: "Map", // Store formatted address for filename
     places: [], // Array of all fetched place objects
     selectedPlaces: {}, // Map placeId -> Place Object (Robust storage)
     placeRoutes: {} // Map placeId -> { polyline, duration }
@@ -60,6 +61,9 @@ async function geocodeAddress(address) {
             alert(data.error);
             return;
         }
+
+        // Store formatted address for filename
+        mapState.addressString = data.formatted_address || address;
 
         const location = { lat: data.lat, lng: data.lng };
         map.setCenter(location);
@@ -427,8 +431,18 @@ async function generateAndDownloadMap() {
         const dataUrl = canvas.toDataURL("image/png");
         const blob = await (await fetch(dataUrl)).blob();
         
+        // Generate filename
+        let filename = "hostmap";
+        if (mapState.addressString && mapState.addressString !== "Map") {
+            // Replace non-alphanumeric chars with underscores, remove trailing/leading underscores
+            const safeName = mapState.addressString.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+            filename += "_" + safeName;
+        }
+        filename += ".png";
+
         const formData = new FormData();
-        formData.append("image", blob, "map.png");
+        formData.append("image", blob, filename); // Pass filename in blob (optional but good practice)
+        formData.append("filename", filename); // Pass explicitly for PHP header
         formData.append("attractionName", "Multi-Attraction Map");
         formData.append("meta", JSON.stringify({
             attractions: legendData,
@@ -445,7 +459,7 @@ async function generateAndDownloadMap() {
             const url = window.URL.createObjectURL(downloadBlob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "map_with_legend.png";
+            a.download = filename; // Use filename here for client-side download attribute
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);

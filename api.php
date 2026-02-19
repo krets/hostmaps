@@ -101,7 +101,10 @@ if ($action === 'geocode') {
     $url = "https://maps.googleapis.com/maps/api/geocode/json?address={$address}&key=" . GOOGLE_MAPS_BACKEND_KEY;
     $data = makeApiCall($url);
     if (isset($data['results'][0]['geometry']['location'])) {
-        echo json_encode($data['results'][0]['geometry']['location']);
+        $result = $data['results'][0];
+        $output = $result['geometry']['location'];
+        $output['formatted_address'] = $result['formatted_address'];
+        echo json_encode($output);
     } else {
         echo json_encode(['error' => 'Location not found']);
     }
