@@ -206,7 +206,7 @@ button:hover {
     #show-list-btn {
         display: block !important;
         position: fixed; /* Fixed to viewport */
-        bottom: 20px;
+        bottom: 90px; /* Higher up to avoid mobile browser bars */
         right: 20px;
         z-index: 500; /* Above map tiles */
         padding: 12px 20px;
