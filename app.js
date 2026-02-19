@@ -545,8 +545,10 @@ async function generateAndDownloadMap() {
              staticUrl += `&center=${mapState.center.lat},${mapState.center.lng}&zoom=${mapState.zoom}`;
         }
         
+        
+        // Property Marker (House Icon)
         const pLoc = mapState.propertyLocation || mapState.center;
-        staticUrl += `&markers=icon:${encodeURIComponent("https://maps.google.com/mapfiles/kml/pal4/icon47.png")}%7C${pLoc.lat},${pLoc.lng}`;
+        staticUrl += `&markers=icon:${encodeURIComponent("https://maps.google.com/mapfiles/kml/pal3/icon56.png")}%7C${pLoc.lat},${pLoc.lng}`;
         
         const legendData = [];
         const iconPromises = [];
