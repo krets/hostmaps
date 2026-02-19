@@ -7,7 +7,17 @@ require_once 'config.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rental Property Map Generator</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260219">
+    <style>
+        /* Fail-safe mobile trigger */
+        @media (max-width: 1100px) {
+            .container { display: block !important; overflow: hidden !important; }
+            .sidebar { position: absolute !important; width: 100% !important; height: 100% !important; z-index: 1000 !important; }
+            .sidebar.hidden { transform: translateX(-100%) !important; }
+            #map { height: 100vh !important; width: 100% !important; }
+            .mobile-toggle-btn { display: block !important; }
+        }
+    </style>
     <!-- Google Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
