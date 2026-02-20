@@ -8,7 +8,7 @@ require_once 'config.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rental Property Map Generator</title>
     <link rel="icon" type="image/png" href="favicon.ico">
-    <link rel="stylesheet" href="style.css?v=20260219_4">
+    <link rel="stylesheet" href="style.css?v=20260219_5">
     <style>
         /* Fail-safe mobile trigger */
         @media (max-width: 1100px) {
@@ -60,7 +60,7 @@ require_once 'config.php';
 <script>
     const GOOGLE_MAPS_API_KEY = "<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>";
 </script>
-<script src="app.js?v=20260219_9"></script>
+<script src="app.js?v=20260219_11"></script>
 <!-- Load Google Maps API -->
 <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo GOOGLE_MAPS_FRONTEND_KEY; ?>&libraries=places,marker,geometry&loading=async&v=weekly&callback=initMap" async defer></script>
 

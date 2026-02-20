@@ -11,7 +11,7 @@ let mapState = {
     addressString: "Map", // Store formatted address for filename
     places: [], // Array of all fetched place objects
     selectedPlaces: {}, // Map placeId -> Place Object (Robust storage)
-    placeRoutes: {} // Map placeId -> { polyline, duration }
+    placeRoutes: {} // Map placeId -> { polyline, duration, mode }
 };
 
 // Use async initMap to import libraries
@@ -20,6 +20,17 @@ async function initMap() {
     const { Map } = await google.maps.importLibrary("maps");
     const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
     const { encoding } = await google.maps.importLibrary("geometry"); // Explicitly import geometry
+
+    map = new Map(document.getElementById("map"), {
+        center: { lat: -34.397, lng: 150.644 },
+        zoom: 8,
+        mapId: "DEMO_MAP_ID", // Required for AdvancedMarkerElement
+        disableDefaultUI: false, // Ensure UI controls are visible
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false
+    });
 
     // Random major city for initial view
     const cities = [
@@ -30,17 +41,8 @@ async function initMap() {
         { lat: 37.7749, lng: -122.4194 } // SF
     ];
     const initialCenter = cities[Math.floor(Math.random() * cities.length)];
-
-    map = new Map(document.getElementById("map"), {
-        center: initialCenter,
-        zoom: 10,
-        mapId: "DEMO_MAP_ID", // Required for AdvancedMarkerElement
-        disableDefaultUI: false, // Ensure UI controls are visible
-        zoomControl: true,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false
-    });
+    map.setCenter(initialCenter);
+    map.setZoom(10);
 
     // Keep mapState in sync with actual map view
     map.addListener('idle', () => {
@@ -175,9 +177,14 @@ async function restoreSession(item, isInitialLoad = false) {
     // Render markers for selected items immediately
     await renderPlaceMarkers(selectedList);
     
-    // Fetch routes for selected items
+    // Fetch routes for selected items (using saved mode if available)
     for (const place of selectedList) {
-        await addRoute(place);
+        // Need to check if we have a saved route mode in history?
+        // Actually history stores selectedPlaces objects. We don't store mapState.placeRoutes in history item directly.
+        // We should probably check if selectedPlaces has mode info attached or default to driving.
+        // Currently saveHistory saves selectedPlaces. Let's assume default 'driving' unless we enhance saveHistory.
+        // For now, default driving. Future improvement: save modes in history.
+        await addRoute(place, 'driving'); 
         updateMarkerStyle(place.id, true);
     }
     
@@ -331,9 +338,6 @@ async function searchForPlace(query) {
         renderPlacesList(mapState.places);
         await renderPlaceMarkers(uniqueNew); // Only add markers for new ones
         
-        // Mobile: Show map to confirm result? Or maybe stay on list to select.
-        // Let's stay on list so they can tap to select.
-
     } catch (e) {
         console.error("Manual search error:", e);
     }
@@ -375,12 +379,13 @@ function renderPlacesList(places) {
         if (place.primaryType === "tourist_attraction") iconName = "local_see";
         if (place.primaryType === "ski_resort") iconName = "ac_unit";
 
-        // Check if selected (using map key)
-        if (mapState.selectedPlaces[place.id]) {
+        const isSelected = !!mapState.selectedPlaces[place.id];
+        if (isSelected) {
             item.classList.add("selected");
         }
 
-        item.innerHTML = `
+        // Base Content
+        let contentHtml = `
             <i class="material-icons attraction-icon">${iconName}</i>
             <div class="attraction-info">
                 <span class="attraction-name">${place.displayName.text}</span>
@@ -388,12 +393,38 @@ function renderPlacesList(places) {
                 <span class="route-info" id="route-${place.id}"></span>
             </div>
         `;
+        
+        item.innerHTML = contentHtml;
+
+        // Mode Selector (Visible if selected)
+        if (isSelected) {
+            const modeContainer = document.createElement("div");
+            modeContainer.className = "mode-selector";
+            
+            ['driving', 'walking', 'transit'].forEach(mode => {
+                 const btn = document.createElement('i');
+                 btn.className = 'material-icons mode-btn';
+                 btn.textContent = mode === 'driving' ? 'directions_car' : (mode === 'walking' ? 'directions_walk' : 'directions_bus');
+                 btn.title = mode;
+                 
+                 const currentMode = mapState.placeRoutes[place.id]?.mode || 'driving';
+                 if (mode === currentMode) btn.classList.add('active');
+                 
+                 btn.onclick = (e) => {
+                     e.stopPropagation(); 
+                     changeTravelMode(place, mode);
+                 };
+                 modeContainer.appendChild(btn);
+            });
+            item.appendChild(modeContainer);
+        }
 
         // Restore route info if already fetched
         if (mapState.placeRoutes[place.id]) {
              setTimeout(() => {
                  const el = document.getElementById(`route-${place.id}`);
-                 if(el) el.textContent = `${mapState.placeRoutes[place.id].duration} drive`;
+                 const r = mapState.placeRoutes[place.id];
+                 if(el) el.textContent = `${r.duration} ${r.mode === 'driving' ? 'drive' : r.mode}`;
              }, 0);
         }
 
@@ -435,19 +466,23 @@ async function togglePlaceSelection(place) {
     } else {
         // Select: Add to map
         mapState.selectedPlaces[place.id] = place; // Store full object
-        await addRoute(place);
+        await addRoute(place, 'driving'); // Default to driving
         updateMarkerStyle(place.id, true);
-        
-        // Mobile: Maybe switch to map to show route? 
-        // User might want to select multiple. Let's keep them on list unless they click "View Map".
     }
 
-    updateUI(place.id, !isSelected);
+    updateUI(place.id, !isSelected); // This re-renders list to show/hide mode selector
     // Check if keys array has length
     document.getElementById("download-btn").disabled = Object.keys(mapState.selectedPlaces).length === 0;
     
     // Update History
     updateHistorySelection();
+}
+
+async function changeTravelMode(place, mode) {
+    // Explicitly call addRoute with the new mode
+    await addRoute(place, mode);
+    // Force re-render list to update the text (e.g. "5 min walk") and the active button state
+    renderPlacesList(mapState.places); 
 }
 
 async function updateMarkerStyle(placeId, isSelected) {
@@ -464,19 +499,17 @@ async function updateMarkerStyle(placeId, isSelected) {
 }
 
 function updateUI(placeId, isSelected) {
-    const item = document.querySelector(`.attraction-item[data-id="${placeId}"]`);
-    if (item) {
-        if (isSelected) item.classList.add("selected");
-        else item.classList.remove("selected");
-    }
+    // Re-render list to ensure mode selector state is correct
+    // Optimization: could just update one item, but full render is safe
+    renderPlacesList(mapState.places);
 }
 
-async function addRoute(place) {
+async function addRoute(place, mode = 'driving') {
     const startLoc = mapState.propertyLocation || mapState.center;
     const origin = `${startLoc.lat},${startLoc.lng}`;
     const destination = `${place.location.latitude},${place.location.longitude}`;
     try {
-        const response = await fetch(`api.php?action=directions&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving`);
+        const response = await fetch(`api.php?action=directions&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=${mode}`);
         const data = await response.json();
         
         if (data.error) {
@@ -484,20 +517,32 @@ async function addRoute(place) {
             return;
         }
 
-        const routeEl = document.getElementById(`route-${place.id}`);
-        if (routeEl) routeEl.textContent = `${data.duration} drive`;
+        // Draw on map
+        // Remove existing polyline for this place if any
+        if (placePolylines[place.id]) {
+            placePolylines[place.id].setMap(null);
+        }
 
         const decodedPath = google.maps.geometry.encoding.decodePath(data.polyline);
+        
+        // Different color/style for walk/transit?
+        let color = "#FF0000"; // Red for drive
+        if (mode === 'walking') color = "#00FF00"; // Green for walk
+        if (mode === 'transit') color = "#0000FF"; // Blue for transit
+
         const polyline = new google.maps.Polyline({
             path: decodedPath,
             geodesic: true,
-            strokeColor: "#FF0000",
+            strokeColor: color,
             strokeOpacity: 0.7,
             strokeWeight: 4
         });
         polyline.setMap(map);
         placePolylines[place.id] = polyline;
-        mapState.placeRoutes[place.id] = { polyline: data.polyline, duration: data.duration };
+        mapState.placeRoutes[place.id] = { polyline: data.polyline, duration: data.duration, mode: mode };
+        
+        // Update History?
+        
     } catch (e) {
         console.error("Failed to fetch directions:", e);
     }
@@ -509,19 +554,17 @@ function removeRoute(placeId) {
         delete placePolylines[placeId];
     }
     delete mapState.placeRoutes[placeId];
-    const routeEl = document.getElementById(`route-${placeId}`);
-    if (routeEl) routeEl.textContent = "";
 }
 
 function loadIcon(url) {
     const proxyUrl = `api.php?action=proxy&url=${encodeURIComponent(url)}`;
-    return new Promise((resolve) => {
+    return new Promise((resolve) => { // Resolve even on error to prevent Promise.all failure
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = () => resolve(img);
         img.onerror = () => {
             console.warn(`Failed to load icon: ${url}`);
-            resolve(null);
+            resolve(null); // Return null on failure
         };
         img.src = proxyUrl;
     });
@@ -538,15 +581,12 @@ async function generateAndDownloadMap() {
         const height = 480;
         let staticUrl = `https://maps.googleapis.com/maps/api/staticmap?size=${width}x${height}&maptype=roadmap`;
         
-        // Get Selected Places from our robust map
         const selectedPlacesList = Object.values(mapState.selectedPlaces);
 
         if (selectedPlacesList.length === 0) {
              staticUrl += `&center=${mapState.center.lat},${mapState.center.lng}&zoom=${mapState.zoom}`;
         }
         
-        
-        // Property Marker (House Icon)
         const pLoc = mapState.propertyLocation || mapState.center;
         staticUrl += `&markers=icon:${encodeURIComponent("https://maps.google.com/mapfiles/kml/pal3/icon56.png")}%7C${pLoc.lat},${pLoc.lng}`;
         
@@ -556,22 +596,27 @@ async function generateAndDownloadMap() {
         selectedPlacesList.forEach((place, index) => {
             const id = place.id;
             const route = mapState.placeRoutes[id];
-            
             const label = String.fromCharCode(65 + (index % 26));
             
-            // MAP: Standard Red Markers with Labels
             staticUrl += `&markers=color:red%7Clabel:${label}%7C${place.location.latitude},${place.location.longitude}`;
             
-            // LEGEND: Paddle Icons
             const paddleIconUrl = `https://maps.google.com/mapfiles/kml/paddle/${label}.png`;
             
-            legendData.push({ label, name: place.displayName.text, duration: route ? route.duration : '', iconUrl: paddleIconUrl });
+            // Format text with mode
+            const durationStr = route ? `${route.duration} ${route.mode === 'driving' ? 'drive' : route.mode}` : '';
+            
+            legendData.push({ label, name: place.displayName.text, duration: durationStr, iconUrl: paddleIconUrl });
             iconPromises.push(loadIcon(paddleIconUrl));
         });
 
         // Polylines
         Object.values(mapState.placeRoutes).forEach(r => {
-             const stylePrefix = "color:0xff0000ff|weight:5|enc:";
+             // Change color based on mode in static map?
+             let color = "0xff0000ff"; // Red
+             if (r.mode === 'walking') color = "0x00ff00ff"; // Green
+             if (r.mode === 'transit') color = "0x0000ffff"; // Blue
+             
+             const stylePrefix = `color:${color}|weight:5|enc:`;
              staticUrl += `&path=${encodeURIComponent(stylePrefix)}${encodeURIComponent(r.polyline)}`;
         });
 
@@ -617,27 +662,24 @@ async function generateAndDownloadMap() {
             }
 
             ctx.fillStyle = "black";
-            const durationText = item.duration ? `(${item.duration} drive)` : "";
-            ctx.fillText(`${item.name} ${durationText}`, 90, y);
+            // Use pre-formatted duration string
+            ctx.fillText(`${item.name} (${item.duration})`, 90, y);
         });
 
         const dataUrl = canvas.toDataURL("image/png");
         const blob = await (await fetch(dataUrl)).blob();
         
-        // Generate filename
         let filename = "hostmap";
         if (mapState.addressString && mapState.addressString !== "Map") {
-            // Take only the first part (Street Num + Name), e.g., "319 Old Lake Shore Rd"
             const streetAddress = mapState.addressString.split(',')[0].trim();
-            // Replace non-alphanumeric chars with underscores
             const safeName = streetAddress.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
             filename += "_" + safeName;
         }
         filename += ".png";
 
         const formData = new FormData();
-        formData.append("image", blob, filename); // Pass filename in blob (optional but good practice)
-        formData.append("filename", filename); // Pass explicitly for PHP header
+        formData.append("image", blob, filename); 
+        formData.append("filename", filename);
         formData.append("attractionName", "Multi-Attraction Map");
         formData.append("meta", JSON.stringify({
             attractions: legendData,
@@ -654,7 +696,7 @@ async function generateAndDownloadMap() {
             const url = window.URL.createObjectURL(downloadBlob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = filename; // Use filename here for client-side download attribute
+            a.download = filename; 
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);

@@ -170,7 +170,8 @@ if ($action === 'proxy') {
 if ($action === 'directions') {
     $origin = urlencode($_GET['origin'] ?? '');
     $destination = urlencode($_GET['destination'] ?? '');
-    $url = "https://maps.googleapis.com/maps/api/directions/json?origin={$origin}&destination={$destination}&mode=driving&key=" . GOOGLE_MAPS_BACKEND_KEY;
+    $mode = urlencode($_GET['mode'] ?? 'driving');
+    $url = "https://maps.googleapis.com/maps/api/directions/json?origin={$origin}&destination={$destination}&mode={$mode}&key=" . GOOGLE_MAPS_BACKEND_KEY;
     $data = makeApiCall($url);
     if (isset($data['routes'][0])) {
         $route = $data['routes'][0];
